@@ -30,18 +30,20 @@
 #define API_NULL(obj, code_block, ...)                                         \
   API_STATUS_INTERNAL(((obj) == NULL), code_block, __VA_ARGS__)
 
-static inline void print_buf(void *buf, size_t nbytes) {
+static inline void print_buf(void *buf, size_t nbytes, int rank) {
   size_t i = 0;
-  printf("\n============[%zu bytes START]===========\n", nbytes);
+  printf("\n============[%zu bytes RANK %d START]===========\n", nbytes, rank);
   for (i = 0; i < nbytes; i++) {
     if (i % 8 == 0) {
       printf("\n");
+      printf("[Rank(%d) 0x%lx]: ", rank, i);
     }
 
     printf("%02x \t", *(uint8_t *)(buf + i));
   }
 
-  printf("\n============[RX %zu bytes END]=============\n", nbytes);
+  printf("\n============[RX %zu bytes RANK %d END]=============\n", nbytes,
+         rank);
 }
 
 static inline int randomize_buf(void **buf, size_t nbytes) {
@@ -63,13 +65,11 @@ static inline int fill_buf(void **buf, size_t nbytes, int pattern) {
   return (0);
 }
 
-
 static int send_recv(MPI_Comm new_comm, void *send_buf, size_t send_size,
                      void *recv_buf, size_t recv_size) {
-  MPI_Request send_req;
   MPI_Request recv_req;
   MPI_Status status;
-  int rank = -1;
+  int rank = -1, recv_rank = -1, send_rank = -1;
   int size = 0;
 
   // TODO: Add error handling support
@@ -80,20 +80,17 @@ static int send_recv(MPI_Comm new_comm, void *send_buf, size_t send_size,
   randomize_buf(&recv_buf, recv_size);
 
   // Ring: LEFT => RANK => RIGHT
-  // Recv from ((size - rank - 1) % size, (rank - 1) % size)
+  // Recv from (rank - 1 + size) % size
   // Send to (rank + 1) % size
-
-  int recv_rank =
-      ((rank - 1) < 0) ? ((size - rank - 1) % size) : ((rank - 1) % size);
-  int send_rank = (rank + 1) % size;
+  recv_rank = (rank - 1 + size) % size;
+  send_rank = (rank + 1) % size;
 
   MPI_Irecv(recv_buf, recv_size, MPI_UINT8_T, recv_rank, 0, new_comm,
             &recv_req);
-  MPI_Isend(send_buf, send_size, MPI_UINT8_T, send_rank, 0, new_comm,
-            &send_req);
+  MPI_Send(send_buf, send_size, MPI_UINT8_T, send_rank, 0, new_comm);
   MPI_Wait(&recv_req, &status);
-  MPI_Wait(&send_req, &status);
-  print_buf(recv_buf, recv_size);
+
+  print_buf(recv_buf, recv_size, rank);
 
   return 0;
 }
