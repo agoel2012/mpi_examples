@@ -2,7 +2,8 @@
 ## Supported primitives
 - Rank0->Rank1, Rank1->Rank2, RankN-1->Rank0 `Send/Recv`
 - Rank0->Rank1, RankN-1 `Bcast`
-- Rank0->Rank1 (1/Nth), RankN-1 (N-1/Nth) `Scatter`
+- RankN-1->Rank0->Rank1 (send 0th, recvN-1th, ADD old + recv), Rank0->Rank1->Rank2 (send 1st, recv 0th, ADD old + recv) `RingAllReduce(ADD)`
+- RankN-1->Rank0->Rank1 (send 0th, recvN-1th), Rank0->Rank1->Rank2 (send 1st, recv 0th) `RingAllgather`
 ## Tutorial
 To install `mpich`
 ```
